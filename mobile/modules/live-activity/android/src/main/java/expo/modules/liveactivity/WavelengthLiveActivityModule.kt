@@ -99,11 +99,13 @@ class WavelengthLiveActivityModule : Module() {
       .setOngoing(a.isPlaying)
       .setOnlyAlertOnce(true)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-      // Glanceable status-bar chip text near the cutout.
-      .setShortCriticalText(a.duration)
+      // Classic determinate progress bar. (NotificationCompat.ProgressStyle and
+      // setShortCriticalText from the Android 16 APIs don't resolve against the
+      // androidx.core that actually lands in this build, so we use the long-stable
+      // setProgress + request promotion to a Live Update instead.)
+      .setProgress(100, pct, false)
       // Request promotion to a Live Update (system may decline / rate-limit).
       .setRequestPromotedOngoing(true)
-      .setStyle(NotificationCompat.ProgressStyle().setProgress(pct))
 
     NotificationManagerCompat.from(context).notify(notifId, builder.build())
   }
