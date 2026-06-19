@@ -18,11 +18,16 @@ somewhere public and point the app at it:
 1. Set up a persistent database — see [`server/ATLAS.md`](server/ATLAS.md).
 2. Deploy `server/` to a host (e.g. [Render](https://render.com),
    [Railway](https://railway.app), or [Fly.io](https://fly.io)):
-   - Start command: `npm start`
-   - Env vars: `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`
+   - **Render (easiest):** a [`render.yaml`](render.yaml) blueprint is included —
+     New → Blueprint → pick this repo, then set `MONGO_URI` (and optional
+     `JAMENDO_CLIENT_ID`) in the dashboard. `JWT_SECRET` is auto-generated.
+   - **Any Docker host:** a [`server/Dockerfile`](server/Dockerfile) is included.
+   - Manual: start command `npm start`; env vars `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`.
 3. You'll get a URL like `https://wavelength-api.onrender.com`.
-4. In [`mobile/src/config.ts`](mobile/src/config.ts), set `API_BASE` to that
-   HTTPS URL for production (the `Platform.select` localhost values are for dev).
+4. Point the app at it for production via **`EXPO_PUBLIC_API_URL`** set to that
+   HTTPS URL (in [`mobile/eas.json`](mobile/eas.json) per-profile `env`, or a local
+   `mobile/.env`). [`mobile/src/config.ts`](mobile/src/config.ts) reads it and falls
+   back to the localhost dev values when unset.
 
 ## 2. Link the project to EAS
 From `mobile/`:

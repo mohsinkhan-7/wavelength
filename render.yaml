@@ -1,0 +1,23 @@
+# Render Blueprint for the Wavelength backend (server/).
+# Deploy: push to GitHub, then on render.com → New → Blueprint → pick this repo.
+# Set the secret env vars (MONGO_URI, JAMENDO_CLIENT_ID) in the dashboard.
+# See DEPLOYMENT.md + server/ATLAS.md for the full walkthrough.
+services:
+  - type: web
+    name: wavelength-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: MONGO_URI          # MongoDB Atlas connection string — set in dashboard (see server/ATLAS.md)
+        sync: false
+      - key: JWT_SECRET         # auto-generated strong secret
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: JAMENDO_CLIENT_ID  # optional — free key from devportal.jamendo.com; set in dashboard
+        sync: false
