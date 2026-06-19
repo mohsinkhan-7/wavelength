@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "image": "latest",
       "ios": {
         "simulator": true
       }
@@ -14,13 +15,15 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "image": "latest",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "image": "latest"
     }
   },
   "submit": {
