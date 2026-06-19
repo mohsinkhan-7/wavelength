@@ -99,13 +99,13 @@ class WavelengthLiveActivityModule : Module() {
       .setOngoing(a.isPlaying)
       .setOnlyAlertOnce(true)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-      // Classic determinate progress bar. (NotificationCompat.ProgressStyle and
-      // setShortCriticalText from the Android 16 APIs don't resolve against the
-      // androidx.core that actually lands in this build, so we use the long-stable
-      // setProgress + request promotion to a Live Update instead.)
+      // NOTE: the Android 16 "Live Update" APIs (NotificationCompat.ProgressStyle,
+      // setShortCriticalText, setRequestPromotedOngoing) do NOT resolve against the
+      // androidx.core version that actually lands in this RN/Expo build, so we post a
+      // standard ongoing notification with a classic progress bar instead. This is an
+      // optional surface — expo-audio already posts the main media notification on
+      // Android. Restore the promoted Live Update once core 1.16.0+ resolves cleanly.
       .setProgress(100, pct, false)
-      // Request promotion to a Live Update (system may decline / rate-limit).
-      .setRequestPromotedOngoing(true)
 
     NotificationManagerCompat.from(context).notify(notifId, builder.build())
   }
