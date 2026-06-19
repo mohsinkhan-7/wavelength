@@ -1,0 +1,25 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.trufe.wavelength'
+version = '1.0.0'
+
+expoModule {
+  canBePublished false
+}
+
+android {
+  namespace 'expo.modules.liveactivity'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // 1.16.0 ships the Android 16 notification APIs we use:
+  // NotificationCompat.ProgressStyle, setRequestPromotedOngoing, setShortCriticalText.
+  implementation 'androidx.core:core-ktx:1.16.0'
+}

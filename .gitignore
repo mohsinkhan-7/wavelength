@@ -1,0 +1,49 @@
+# ---- Dependencies ----
+**/node_modules/
+.pnp
+.pnp.js
+
+# ---- Secrets / env (NEVER commit) ----
+.env
+.env.*
+!.env.example
+*.tmp.*
+**/android-apk-cache/
+
+# ---- Expo / React Native ----
+.expo/
+**/.expo/
+dist/
+web-build/
+expo-env.d.ts
+# Native projects are generated via prebuild
+/mobile/android/
+/mobile/ios/
+
+# ---- Build artifacts ----
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+build/
+.gradle/
+
+# ---- Logs ----
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ---- Editor / tooling (local) ----
+.claude/
+.vscode/
+.idea/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini

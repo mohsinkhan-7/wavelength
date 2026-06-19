@@ -1,0 +1,9 @@
+{
+  "name": "wavelength-live-activity",
+  "version": "1.0.0",
+  "description": "Now Playing Live Activity (Dynamic Island) for Wavelength",
+  "main": "index.ts",
+  "author": "Trufe",
+  "license": "MIT",
+  "homepage": "https://trufe.com"
+}
