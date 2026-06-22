@@ -40,6 +40,16 @@ const PORT = process.env.PORT || 4000;
 // whole service down; the error is logged loudly for diagnosis.
 app.listen(PORT, () => console.log(`🎵 Wavelength API listening on port ${PORT}`));
 
-connectDB(process.env.MONGO_URI).catch((e) => {
-  console.error('⚠️  MongoDB connection failed (auth/playlists disabled until fixed):', e.message);
-});
+// Connect to Mongo with retry. If the first attempt fails (e.g. Atlas IP
+// allowlist not yet active), keep retrying every 10s so the service self-heals
+// once the DB becomes reachable — no redeploy needed. Auth/playlist routes
+// start working the moment a connection succeeds.
+async function connectWithRetry(attempt = 1) {
+  try {
+    await connectDB(process.env.MONGO_URI);
+  } catch (e) {
+    console.error(`⚠️  MongoDB connection failed (attempt ${attempt}): ${e.message}`);
+    setTimeout(() => connectWithRetry(attempt + 1), 10000);
+  }
+}
+connectWithRetry();
