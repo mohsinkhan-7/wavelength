@@ -32,11 +32,14 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 4000;
 
-connectDB(process.env.MONGO_URI)
-  .then(() => {
-    app.listen(PORT, () => console.log(`🎵 Wavelength API on http://localhost:${PORT}`));
-  })
-  .catch((e) => {
-    console.error('Failed to connect to MongoDB:', e.message);
-    process.exit(1);
-  });
+// Start the HTTP server FIRST so the platform health check (GET /) passes
+// immediately and the deploy goes live. The catalog endpoints (Deezer/Jamendo
+// proxy) work without a database. Then connect to Mongo in the background —
+// auth/playlist routes start working once it's connected. We deliberately do
+// NOT exit on a DB failure, so a transient Atlas/network blip doesn't take the
+// whole service down; the error is logged loudly for diagnosis.
+app.listen(PORT, () => console.log(`🎵 Wavelength API listening on port ${PORT}`));
+
+connectDB(process.env.MONGO_URI).catch((e) => {
+  console.error('⚠️  MongoDB connection failed (auth/playlists disabled until fixed):', e.message);
+});
