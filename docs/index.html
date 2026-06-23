@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Wavelength — Download</title>
+  <meta name="description" content="Wavelength — stream music on Android. Download the app." />
+  <meta name="theme-color" content="#0B0B0F" />
+  <!-- Open Graph so the link looks good when shared in WhatsApp/Telegram/etc. -->
+  <meta property="og:title" content="Wavelength" />
+  <meta property="og:description" content="Stream music on Android. Tap to download." />
+  <meta property="og:type" content="website" />
+  <style>
+    :root {
+      --bg: #0B0B0F;
+      --card: #15151D;
+      --accent: #5B3FD6;
+      --accent-2: #8B6CF0;
+      --text: #F4F4F8;
+      --muted: #9A9AAE;
+      --border: #262633;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--text); }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 56px;
+      background:
+        radial-gradient(900px 500px at 50% -10%, rgba(91,63,214,0.35), transparent 60%),
+        var(--bg);
+    }
+    .logo {
+      width: 96px; height: 96px; border-radius: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center;
+      box-shadow: 0 12px 40px rgba(91,63,214,0.45);
+      margin-top: 24px;
+    }
+    .logo svg { width: 52px; height: 52px; }
+    h1 { font-size: 2rem; letter-spacing: -0.02em; margin-top: 22px; }
+    .tagline { color: var(--muted); margin-top: 8px; font-size: 1.05rem; text-align: center; }
+    .ver { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    .cta {
+      display: inline-flex; align-items: center; gap: 12px;
+      margin-top: 34px;
+      padding: 18px 34px;
+      font-size: 1.15rem; font-weight: 600;
+      color: #fff; text-decoration: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(91,63,214,0.45);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .cta:active { transform: translateY(1px) scale(0.99); }
+    .cta svg { width: 24px; height: 24px; }
+    .size { color: var(--muted); font-size: 0.85rem; margin-top: 12px; }
+
+    .card {
+      width: 100%; max-width: 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 22px 8px;
+      margin-top: 40px;
+    }
+    .card h2 { font-size: 1rem; color: var(--accent-2); margin-bottom: 14px; letter-spacing: 0.02em; text-transform: uppercase; }
+    ol { list-style: none; counter-reset: step; }
+    ol li { counter-increment: step; position: relative; padding: 0 0 18px 44px; color: #d9d9e6; line-height: 1.5; }
+    ol li::before {
+      content: counter(step);
+      position: absolute; left: 0; top: -2px;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(91,63,214,0.18); color: var(--accent-2);
+      display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
+    }
+    ol li b { color: #fff; }
+    .note {
+      width: 100%; max-width: 520px;
+      margin-top: 18px; padding: 14px 16px;
+      font-size: 0.85rem; color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border); border-radius: 12px;
+    }
+    .android-only { margin-top: 26px; color: var(--muted); font-size: 0.8rem; }
+    footer { margin-top: 40px; color: #55556a; font-size: 0.78rem; text-align: center; }
+    @media (max-width: 420px) { h1 { font-size: 1.6rem; } .cta { width: 100%; justify-content: center; } }
+  </style>
+</head>
+<body>
+  <div class="logo" aria-hidden="true">
+    <!-- simple waveform mark -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round">
+      <path d="M3 12h2M7 7v10M11 4v16M15 8v8M19 11v2M21 12h0" />
+    </svg>
+  </div>
+
+  <h1>Wavelength</h1>
+  <p class="tagline">Stream music. Discover artists. On your phone.</p>
+  <p class="ver" id="version">Android · v1.0</p>
+
+  <a class="cta" id="download" href="https://github.com/mohsinkhan-7/wavelength/releases/download/v1/wavelength.apk">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" />
+    </svg>
+    Download for Android
+  </a>
+  <p class="size" id="size">.apk · ~100 MB</p>
+
+  <div class="card">
+    <h2>How to install</h2>
+    <ol>
+      <li>Tap <b>Download for Android</b> above. Chrome may warn "this type of file can harm your device" — tap <b>Download anyway</b> (it's safe, just not from the Play Store).</li>
+      <li>Open the downloaded <b>wavelength.apk</b> (from the notification or your <b>Downloads</b>).</li>
+      <li>If prompted, allow <b>"Install unknown apps"</b> for Chrome, then tap <b>Install</b>.</li>
+      <li>Open <b>Wavelength</b> and sign up — you're in. 🎧</li>
+    </ol>
+  </div>
+
+  <p class="note">📱 This is an Android app (<code>.apk</code>). iPhone isn't supported via this download. If installation is blocked, go to <b>Settings → Apps → Special access → Install unknown apps → Chrome → Allow</b>.</p>
+
+  <p class="android-only">Made with ♥ · Wavelength</p>
+  <footer>If the app is slow on first open, the server is waking up — give it ~30 seconds.</footer>
+</body>
+</html>
