@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import AppBackground from '@/components/AppBackground';
 import Glass from '@/components/Glass';
@@ -33,7 +33,10 @@ export default function Login() {
     >
       <AppBackground />
       <View style={styles.header}>
-        <Text style={styles.logo}>🎵 Wavelength</Text>
+        <View style={styles.brandRow}>
+          <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+          <Text style={styles.logo}>Wavelength</Text>
+        </View>
         <Text style={styles.tagline}>Stream the world. Listen anywhere.</Text>
       </View>
 
@@ -64,6 +67,8 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.xl, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: spacing.xl },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoMark: { width: 44, height: 44, borderRadius: 10 },
   logo: { color: colors.text, fontSize: font.title, fontFamily: fonts.display },
   tagline: { color: colors.textMuted, fontSize: font.body, marginTop: spacing.sm },
   card: { padding: spacing.lg },
