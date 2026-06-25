@@ -5,8 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider node src/index.js",
+    "dev": "NODE_OPTIONS=--openssl-legacy-provider node --watch src/index.js",
     "dev:mem": "node scripts/dev-mem.mjs",
     "smoke": "node scripts/smoke.mjs"
   },

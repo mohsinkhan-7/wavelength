@@ -1,4 +1,4 @@
-export type TrackSource = 'audius' | 'deezer' | 'jamendo';
+export type TrackSource = 'audius' | 'deezer' | 'jamendo' | 'jiosaavn' | 'archive';
 
 // A normalized track used throughout the app. `streamUrl` is the Audius stream
 // endpoint (full track) or the Deezer 30s preview MP3; `localUri` is set when

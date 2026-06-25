@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { searchTracks } from '@/api/audius';
 import { searchJamendo } from '@/api/jamendo';
+import { searchJioSaavn } from '@/api/jiosaavn';
 import AppBackground from '@/components/AppBackground';
 import TrackRow from '@/components/TrackRow';
 import { usePlayer } from '@/store/player';
@@ -31,11 +32,16 @@ export default function Search() {
     }
     debounce.current = setTimeout(async () => {
       setLoading(true);
-      // Both sources are full tracks, so merge into one list (Audius first).
-      const [a, j] = await Promise.allSettled([searchTracks(query, 40), searchJamendo(query, 25)]);
+      // Merge full-track sources: JioSaavn first (Bollywood), then Audius, then Jamendo.
+      const [s, a, j] = await Promise.allSettled([
+        searchJioSaavn(query, 25),
+        searchTracks(query, 25),
+        searchJamendo(query, 25),
+      ]);
+      const saavn = s.status === 'fulfilled' ? s.value : [];
       const audius = a.status === 'fulfilled' ? a.value : [];
       const jamendo = j.status === 'fulfilled' ? j.value : [];
-      setResults([...audius, ...jamendo]);
+      setResults([...saavn, ...audius, ...jamendo]);
       setSearched(true);
       setLoading(false);
     }, 400);

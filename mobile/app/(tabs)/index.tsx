@@ -3,6 +3,8 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GENRE_ROWS, getTrending, getUndergroundTrending, searchTracks } from '@/api/audius';
 import { getJamendoLatest, getJamendoPopular, getJamendoTracks } from '@/api/jamendo';
+import { getJioSaavnTrending } from '@/api/jiosaavn';
+import { getArchiveBollywood } from '@/api/archive';
 import AppBackground from '@/components/AppBackground';
 import Section from '@/components/Section';
 import { useAuth } from '@/store/auth';
@@ -41,6 +43,8 @@ const JAMENDO_GENRE_ROWS: { key: string; title: string; tag: string }[] = [
 
 const FEEDS: Feed[] = [
   { key: 'trending', title: 'Trending', fetch: (o) => getTrending({ time: 'week', limit: PAGE, offset: o }) },
+  { key: 'jiosaavn-trending', title: 'Bollywood Hits', fetch: (o) => getJioSaavnTrending(PAGE, Math.floor(o / PAGE) + 1) },
+  { key: 'archive-bollywood', title: 'Classic Bollywood', fetch: (o) => getArchiveBollywood(PAGE, o) },
   { key: 'underground', title: 'Underground', fetch: (o) => getUndergroundTrending(PAGE, o) },
   { key: 'jamendo-popular', title: 'Popular Worldwide', fetch: (o) => getJamendoPopular(PAGE, o) },
   { key: 'jamendo-fresh', title: 'Fresh Releases', fetch: (o) => getJamendoLatest(PAGE, o) },
