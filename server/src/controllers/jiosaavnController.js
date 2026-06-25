@@ -21,15 +21,16 @@ const getCached = (k) => {
 };
 const setCached = (k, data) => cache.set(k, { at: Date.now(), data });
 
-// DES-CBC decrypt a JioSaavn encrypted_media_url.
+// Decrypt a JioSaavn encrypted_media_url. JioSaavn uses DES-ECB (key '38346591',
+// no IV) — NOT DES-CBC. On OpenSSL 3 (Node 18+) DES lives in the legacy provider,
+// so the start script sets NODE_OPTIONS=--openssl-legacy-provider.
 function decryptUrl(enc) {
   if (!enc) return null;
   try {
-    const key = Buffer.from('38346591');
-    const iv = Buffer.alloc(8, 0);
-    const dec = createDecipheriv('des', key, iv);
+    const dec = createDecipheriv('des-ecb', Buffer.from('38346591'), null);
+    dec.setAutoPadding(true);
     const out = Buffer.concat([dec.update(Buffer.from(enc, 'base64')), dec.final()]);
-    return out.toString().replace('http://', 'https://').replace('.mp4', '.mp3');
+    return out.toString('utf8').replace('http://', 'https://').replace('.mp4', '.mp3');
   } catch {
     // DES unavailable (OpenSSL 3 legacy provider disabled). Set NODE_OPTIONS above.
     return null;
@@ -104,6 +105,10 @@ async function saavnGet(call, extra = {}) {
 }
 
 // GET /api/catalog/jiosaavn/trending?limit=25&p=1
+// Powers the "Bollywood Hits" row. NOTE: content.getTrending returns song
+// objects WITHOUT encrypted_media_url (no playable stream), so we source the
+// row from search.getResults for current Hindi hits instead — those results
+// include the encrypted stream URL and decrypt cleanly.
 export async function jiosaavnTrending(req, res) {
   const limit = Math.min(parseInt(req.query.limit, 10) || 25, 50);
   const p = parseInt(req.query.p, 10) || 1;
@@ -112,15 +117,9 @@ export async function jiosaavnTrending(req, res) {
   const cached = getCached(key);
   if (cached) return res.json(cached);
 
-  const json = await saavnGet('content.getTrending', {
-    entity_type: 'song',
-    entity_language: 'hindi',
-    p: String(p),
-    n: String(limit),
-  });
-
-  const raw = json?.data || json?.songs || json || [];
-  const payload = { tracks: mapList(Array.isArray(raw) ? raw : raw.data || []) };
+  const json = await saavnGet('search.getResults', { q: 'bollywood', p: String(p), n: String(limit) });
+  const results = json?.results || json?.songs?.results || [];
+  const payload = { tracks: mapList(results) };
   setCached(key, payload);
   res.json(payload);
 }

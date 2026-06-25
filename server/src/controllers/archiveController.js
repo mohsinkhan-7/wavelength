@@ -101,8 +101,12 @@ export async function archiveBollywood(req, res) {
   const cached = getCached(key);
   if (cached) return res.json(cached);
 
+  // Narrow to actual film music. The broad `bollywood`/`hindi songs` subjects
+  // also tag Hindi-translated Quran/devotional items (which dominate by download
+  // count), so we match the specific "hindi film songs" subject and exclude
+  // religious content.
   const tracks = await searchAndExpand(
-    'subject:(bollywood OR "hindi film songs" OR "hindi songs") AND mediatype:audio',
+    'subject:("hindi film songs") AND mediatype:audio AND NOT subject:(quran OR islam OR recitation OR naat OR bhajan)',
     limit,
     offset
   );
