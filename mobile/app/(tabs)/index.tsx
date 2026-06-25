@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GENRE_ROWS, getTrending, getUndergroundTrending, searchTracks } from '@/api/audius';
-import { getJamendoLatest, getJamendoPopular } from '@/api/jamendo';
+import { getJamendoLatest, getJamendoPopular, getJamendoTracks } from '@/api/jamendo';
 import AppBackground from '@/components/AppBackground';
 import Section from '@/components/Section';
 import { useAuth } from '@/store/auth';
@@ -26,11 +26,29 @@ const LANGUAGE_ROWS: { key: string; title: string; query: string }[] = [
   { key: 'lang-afro', title: 'Afrobeats', query: 'afrobeats' },
 ];
 
+// Jamendo genre/mood rows — full-length, downloadable Creative-Commons tracks
+// filtered by Jamendo tag (fuzzytags) and ordered by monthly popularity.
+const JAMENDO_GENRE_ROWS: { key: string; title: string; tag: string }[] = [
+  { key: 'jam-chillout', title: 'Chillout', tag: 'chillout' },
+  { key: 'jam-electronic', title: 'Electronic', tag: 'electronic' },
+  { key: 'jam-classical', title: 'Classical', tag: 'classical' },
+  { key: 'jam-jazz', title: 'Jazz', tag: 'jazz' },
+  { key: 'jam-rock', title: 'Rock', tag: 'rock' },
+  { key: 'jam-hiphop', title: 'Hip-Hop', tag: 'hiphop' },
+  { key: 'jam-ambient', title: 'Ambient', tag: 'ambient' },
+  { key: 'jam-acoustic', title: 'Acoustic', tag: 'acoustic' },
+];
+
 const FEEDS: Feed[] = [
   { key: 'trending', title: 'Trending', fetch: (o) => getTrending({ time: 'week', limit: PAGE, offset: o }) },
   { key: 'underground', title: 'Underground', fetch: (o) => getUndergroundTrending(PAGE, o) },
   { key: 'jamendo-popular', title: 'Popular Worldwide', fetch: (o) => getJamendoPopular(PAGE, o) },
   { key: 'jamendo-fresh', title: 'Fresh Releases', fetch: (o) => getJamendoLatest(PAGE, o) },
+  ...JAMENDO_GENRE_ROWS.map((r) => ({
+    key: r.key,
+    title: r.title,
+    fetch: (o: number) => getJamendoTracks({ tags: r.tag, order: 'popularity_month', limit: PAGE, offset: o }),
+  })),
   ...LANGUAGE_ROWS.map((r) => ({
     key: r.key,
     title: r.title,
