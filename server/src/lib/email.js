@@ -5,11 +5,14 @@ function createTransporter() {
   if (!SMTP_USER || !SMTP_PASS) {
     throw new Error('Email not configured. Set SMTP_USER and SMTP_PASS in environment.');
   }
-  // Use nodemailer's built-in Gmail config (port 465, SSL) — avoids port-587
-  // STARTTLS hangs that occur on some hosting providers.
+  // Explicit Gmail SSL config with IPv4 forced — Render resolves smtp.gmail.com
+  // to an IPv6 address it can't route; family:4 pins the connection to IPv4.
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    tls: { family: 4 },
   });
 }
 
