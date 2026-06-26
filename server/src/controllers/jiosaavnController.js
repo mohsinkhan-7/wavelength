@@ -30,7 +30,10 @@ function decryptUrl(enc) {
     const dec = createDecipheriv('des-ecb', Buffer.from('38346591'), null);
     dec.setAutoPadding(true);
     const out = Buffer.concat([dec.update(Buffer.from(enc, 'base64')), dec.final()]);
-    return out.toString('utf8').replace('http://', 'https://').replace('.mp4', '.mp3');
+    // Keep the .mp4 extension — JioSaavn serves AAC-in-MP4 (Content-Type
+    // audio/mp4), which ExoPlayer/AVPlayer play natively. Rewriting to .mp3
+    // (as the original code did) 404s on the CDN.
+    return out.toString('utf8').replace('http://', 'https://');
   } catch {
     // DES unavailable (OpenSSL 3 legacy provider disabled). Set NODE_OPTIONS above.
     return null;
