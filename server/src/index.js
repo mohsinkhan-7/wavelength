@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import playlistRoutes from './routes/playlists.js';
 import catalogRoutes from './routes/catalog.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/catalog', catalogRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
