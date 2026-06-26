@@ -1,25 +1,14 @@
-import nodemailer from 'nodemailer';
-
-function createTransporter() {
-  const { SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_USER || !SMTP_PASS) {
-    throw new Error('Email not configured. Set SMTP_USER and SMTP_PASS in environment.');
-  }
-  // Explicit Gmail SSL config with IPv4 forced — Render resolves smtp.gmail.com
-  // to an IPv6 address it can't route; family:4 pins the connection to IPv4.
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-    tls: { family: 4 },
-  });
-}
+import { Resend } from 'resend';
 
 export async function sendPasswordResetOtp(to, otp) {
-  const transporter = createTransporter();
-  await transporter.sendMail({
-    from: `"Wavelength" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('Email not configured. Set RESEND_API_KEY in environment.');
+
+  const resend = new Resend(apiKey);
+  const from = process.env.RESEND_FROM || 'Wavelength <onboarding@resend.dev>';
+
+  const { error } = await resend.emails.send({
+    from,
     to,
     subject: 'Your Wavelength password reset code',
     text: `Your reset code is: ${otp}\n\nThis code expires in 15 minutes.\nIf you didn't request this, ignore this email.`,
@@ -34,4 +23,6 @@ export async function sendPasswordResetOtp(to, otp) {
         <p style="color:#888;font-size:13px;margin-top:20px">Expires in 15 minutes.</p>
       </div>`,
   });
+
+  if (error) throw new Error(error.message);
 }
