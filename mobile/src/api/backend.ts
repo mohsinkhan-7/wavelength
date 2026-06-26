@@ -94,20 +94,6 @@ export async function updateProfile(payload: {
   return { user: normUser(data.user) };
 }
 
-export async function forgotPassword(email: string) {
-  return request<{ message: string }>('/api/auth/forgot-password', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-}
-
-export async function resetPassword(email: string, otp: string, newPassword: string) {
-  return request<{ message: string }>('/api/auth/reset-password', {
-    method: 'POST',
-    body: JSON.stringify({ email, otp, newPassword }),
-  });
-}
-
 // ---- Likes ----
 export async function likeTrack(track: Track) {
   const data = await request<{ likedSongs: any[] }>('/api/me/likes', {
