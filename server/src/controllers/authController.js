@@ -34,4 +34,3 @@ export async function login(req, res) {
   const token = signToken(user._id.toString());
   res.json({ token, user: user.toSafeJSON() });
 }
-
