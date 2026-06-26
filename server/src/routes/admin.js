@@ -32,4 +32,19 @@ router.get('/stats', async (_req, res, next) => {
   }
 });
 
+router.get('/users', async (_req, res, next) => {
+  try {
+    const users = await User.find({}, 'displayName email createdAt likedSongs').sort({ createdAt: -1 }).lean();
+    res.json(users.map(u => ({
+      id:          u._id,
+      displayName: u.displayName,
+      email:       u.email,
+      likedSongs:  u.likedSongs.length,
+      joinedAt:    u.createdAt,
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
