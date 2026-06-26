@@ -1,14 +1,14 @@
 import nodemailer from 'nodemailer';
 
 function createTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    throw new Error('Email not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in environment.');
+  const { SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_USER || !SMTP_PASS) {
+    throw new Error('Email not configured. Set SMTP_USER and SMTP_PASS in environment.');
   }
+  // Use nodemailer's built-in Gmail config (port 465, SSL) — avoids port-587
+  // STARTTLS hangs that occur on some hosting providers.
   return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT) || 587,
-    secure: false,
+    service: 'gmail',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
 }
