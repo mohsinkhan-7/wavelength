@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link, useRouter } from 'expo-router';
 import AppBackground from '@/components/AppBackground';
 import Glass from '@/components/Glass';
 import { Button, FormError, Input } from '@/components/ui';
@@ -8,6 +8,7 @@ import { useAuth } from '@/store/auth';
 import { colors, font, fonts, spacing } from '@/theme';
 
 export default function Login() {
+  const router = useRouter();
   const login = useAuth((s) => s.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +50,9 @@ export default function Login() {
             onChangeText={setEmail}
           />
           <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+          <Pressable onPress={() => router.push('/(auth)/forgot-password' as any)}>
+            <Text style={styles.forgotLink}>Forgot password?</Text>
+          </Pressable>
           <FormError message={error} />
           <Button title="Log in" onPress={onSubmit} loading={loading} />
         </View>
@@ -73,6 +77,7 @@ const styles = StyleSheet.create({
   tagline: { color: colors.textMuted, fontSize: font.body, marginTop: spacing.sm },
   card: { padding: spacing.lg },
   form: { gap: spacing.md },
+  forgotLink: { color: colors.textMuted, fontSize: font.small, textAlign: 'right' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl },
   footerText: { color: colors.textMuted, fontSize: font.body },
   link: { color: colors.primary, fontSize: font.body, fontWeight: '700' },

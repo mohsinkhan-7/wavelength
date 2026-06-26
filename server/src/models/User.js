@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
     displayName: { type: String, required: true, trim: true },
     passwordHash: { type: String, required: true },
     likedSongs: { type: [trackSchema], default: [] },
+    passwordResetOtp:     { type: String },
+    passwordResetExpires: { type: Date },
   },
   { timestamps: true }
 );
