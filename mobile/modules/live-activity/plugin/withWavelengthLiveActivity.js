@@ -1,18 +1,19 @@
 const { withAndroidManifest, AndroidConfig } = require('@expo/config-plugins');
 
 /**
- * Adds the notification permissions the Android 16 "Live Update" chip needs.
- * Media-playback foreground-service permissions are NOT added here — expo-audio's
- * own config plugin already declares them and owns the MediaStyle notification.
+ * Adds the permissions our self-owned media notification needs. The foreground
+ * MediaPlaybackService hosts the MediaSessionCompat and posts the MediaStyle
+ * notification; the foreground-service media-playback permissions are already
+ * declared in app.json (shared with expo-audio).
  *
- *   POST_NOTIFICATIONS          → runtime (Android 13+); without it the chip is dropped
- *   POST_PROMOTED_NOTIFICATIONS → non-runtime (Android 16); required to promote to a Live Update
+ *   POST_NOTIFICATIONS → runtime (Android 13+); without it the media notification is dropped
+ *   WAKE_LOCK          → keep audio decoding alive while the screen is off
  */
 const withWavelengthLiveActivity = (config) =>
   withAndroidManifest(config, (cfg) => {
     AndroidConfig.Permissions.ensurePermissions(cfg.modResults, [
       'android.permission.POST_NOTIFICATIONS',
-      'android.permission.POST_PROMOTED_NOTIFICATIONS',
+      'android.permission.WAKE_LOCK',
     ]);
     return cfg;
   });

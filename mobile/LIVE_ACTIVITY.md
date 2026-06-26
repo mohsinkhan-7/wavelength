@@ -1,4 +1,4 @@
-# Now Playing — Live Activity (iOS) & Live Update (Android)
+# Now Playing — Live Activity (iOS) & Media Controls (Android)
 
 Wavelength shows the current track in each platform's "glanceable" surface, all
 driven by one JS call (`syncNowPlaying`) from the audio engine:
@@ -6,35 +6,50 @@ driven by one JS call (`syncNowPlaying`) from the audio engine:
 - **iOS 16.2+** — a custom **Live Activity** in the **Dynamic Island** (compact,
   minimal, expanded) and on the Lock Screen, with title, artist, play/pause, and
   a progress bar.
-- **Android 16+ (API 36)** — a **Live Update**: a promoted-ongoing
-  `ProgressStyle` notification that surfaces as a **status-bar chip near the
-  camera cutout** and on the lock screen / AOD.
+- **Android** — a self-owned **MediaSession** + **MediaStyle notification** on the
+  lock screen and notification shade, with artwork, a seek bar, and **prev /
+  play-pause / next** controls. Also drives Bluetooth & wired headset buttons.
 
 > The two platforms share the native module name `WavelengthLiveActivity`, so the
-> same JS surface drives both. On web, Expo Go, and Android < 16 the calls are
-> safe no-ops. Both need a real build (`eas build` / `expo run:*`) — neither runs
-> in Expo Go or on web.
+> same JS surface drives both. On web and in Expo Go the calls are safe no-ops.
+> Both need a real build (`eas build` / `expo run:*`).
 
 ## Android specifics
 
-**expo-audio already posts the standard MediaStyle media notification** (lock
-screen + media transport controls) when a track plays — so this module does
-**not** duplicate it. It adds *only* the Android 16 Live Update chip
-([WavelengthLiveActivityModule.kt](modules/live-activity/android/src/main/java/expo/modules/liveactivity/WavelengthLiveActivityModule.kt)).
+The module **owns the entire media notification** — it does **not** use
+expo-audio's built-in lock-screen controls. Why: expo-audio deliberately removes
+the next/previous-track commands (it manages a single item, not our queue), so
+its notification only offers seek ±15s. Instead, a foreground
+[`MediaPlaybackService`](modules/live-activity/android/src/main/java/expo/modules/liveactivity/MediaPlaybackService.kt)
+hosts a `MediaSessionCompat` and posts the notification with real track skip.
+
+Key consequences:
+- **`AudioController` skips `setActiveForLockScreen` on Android** (it's iOS-only
+  now) so expo-audio never posts a competing notification.
+- expo-audio's `setActiveForLockScreen` is also what kept background playback
+  alive past ~3 min. Our foreground service (type `mediaPlayback`) **plus a
+  `PARTIAL_WAKE_LOCK` held while playing** replaces that role.
+- Control taps are forwarded to JS via the `onMediaAction` event
+  ([index.ts](modules/live-activity/index.ts) → `addMediaActionListener`), which
+  drives the player store (`next`/`prev`/`setPlaying`/`seek`). An externally
+  forced pause (audio-focus loss) is mirrored back into the store in
+  [AudioController.tsx](src/components/AudioController.tsx).
 
 - Permissions injected by [the config plugin](modules/live-activity/plugin/withWavelengthLiveActivity.js):
   `POST_NOTIFICATIONS` (runtime, requested on first play via
-  `ensureNotificationPermission()`) and `POST_PROMOTED_NOTIFICATIONS` (Android 16).
-- `compileSdk`/`targetSdk` are pinned to **36** via `expo-build-properties` in
-  [app.json](app.json) so the `ProgressStyle` APIs resolve.
-- Build & test on an **Android 16 device/emulator**:
+  `ensureNotificationPermission()`) and `WAKE_LOCK`. The foreground-service
+  media-playback permissions live in [app.json](app.json).
+- Build & test on an Android device/emulator:
   ```bash
   cd mobile
   eas build -p android --profile development     # or: npx expo prebuild -p android && gradlew assembleDebug
   ```
-  Play a track → you'll see **two** surfaces: expo-audio's media card *and* our
-  progress chip by the cutout. On Android 13–15 only the media card appears
-  (the chip cleanly no-ops).
+  Play a track → the media notification appears on the lock screen and shade with
+  working prev / play-pause / next, a seek bar, and artwork.
+
+> **TODO (polish):** the notification small icon is currently the system
+> `ic_media_play`. Swap in a branded monochrome icon
+> ([MediaPlaybackService.kt](modules/live-activity/android/src/main/java/expo/modules/liveactivity/MediaPlaybackService.kt), `setSmallIcon`).
 
 ---
 

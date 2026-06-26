@@ -1,5 +1,6 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
+import type { EventSubscription } from 'expo-modules-core';
 
 export type NowPlayingState = {
   title: string;
@@ -8,6 +9,20 @@ export type NowPlayingState = {
   progress: number; // 0..1
   position: string; // "1:23"
   duration: string; // "3:45"
+  // Numeric fields used by the Android MediaSession (seek bar + skip buttons).
+  // iOS ignores these — its ContentState is driven by the formatted strings above.
+  positionSec?: number; // seconds
+  durationSec?: number; // seconds
+  artworkUrl?: string;
+  canNext?: boolean;
+  canPrev?: boolean;
+};
+
+// Control events emitted by the native MediaSession (Android lock-screen /
+// notification / Bluetooth & headset buttons). iOS never emits these.
+export type MediaActionEvent = {
+  action: 'play' | 'pause' | 'toggle' | 'next' | 'prev' | 'seek';
+  value?: number; // seconds — only set for `seek`
 };
 
 type NativeLiveActivity = {
@@ -15,14 +30,13 @@ type NativeLiveActivity = {
   startActivity(state: NowPlayingState): Promise<{ id: string } | null>;
   updateActivity(id: string, state: NowPlayingState): Promise<boolean>;
   endActivity(id: string): Promise<boolean>;
+  addListener(event: 'onMediaAction', listener: (e: MediaActionEvent) => void): EventSubscription;
 };
 
 // Resolves to the native module on a real iOS build (ActivityKit Live Activity /
-// Dynamic Island) OR a real Android build (the Android 16 "Live Update" cutout
-// chip — the standard MediaStyle lock-screen notification is owned by expo-audio).
+// Dynamic Island) OR a real Android build (a self-owned MediaSession that posts
+// the full MediaStyle lock-screen notification with prev/play-pause/next + seek).
 // Returns `null` on web and in Expo Go, so every call below safely no-ops there.
-// The module also reports isSupported() === false on Android < 16, keeping it a
-// no-op there too.
 const Native = requireOptionalNativeModule<NativeLiveActivity>('WavelengthLiveActivity');
 
 export function isLiveActivitySupported(): boolean {
@@ -34,7 +48,7 @@ export function isLiveActivitySupported(): boolean {
 }
 
 /**
- * On Android 13+ the Live Update chip needs the runtime POST_NOTIFICATIONS
+ * On Android 13+ the media notification needs the runtime POST_NOTIFICATIONS
  * permission. Call this once in a user-initiated playback context (e.g. on first
  * play) before syncNowPlaying. No-ops on iOS/web/older Android.
  */
@@ -48,11 +62,27 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   }
 }
 
+/**
+ * Subscribe to lock-screen / notification / hardware media-button events.
+ * The returned subscription must be `.remove()`d on teardown. No-ops (returns a
+ * dummy subscription) on platforms without the native module.
+ */
+export function addMediaActionListener(
+  listener: (e: MediaActionEvent) => void
+): EventSubscription {
+  if (!Native?.addListener) return { remove() {} } as EventSubscription;
+  try {
+    return Native.addListener('onMediaAction', listener);
+  } catch {
+    return { remove() {} } as EventSubscription;
+  }
+}
+
 let activityId: string | null = null;
 let lastUpdate = 0;
 
 /**
- * Reconcile the Live Activity with the current player state.
+ * Reconcile the Now Playing surface with the current player state.
  * Pass `null` to end it. `force` bypasses the progress-update throttle
  * (use it on track change and play/pause; iOS rate-limits frequent updates).
  */
@@ -60,7 +90,7 @@ export async function syncNowPlaying(
   state: NowPlayingState | null,
   opts: { force?: boolean } = {}
 ): Promise<void> {
-  if (!Native) return; // off-iOS → no-op
+  if (!Native) return; // unsupported platform → no-op
   try {
     if (!state) {
       await endNowPlaying();
@@ -77,7 +107,7 @@ export async function syncNowPlaying(
     lastUpdate = now;
     await Native.updateActivity(activityId, state);
   } catch {
-    // Never let the Live Activity disrupt playback.
+    // Never let the Now Playing surface disrupt playback.
   }
 }
 

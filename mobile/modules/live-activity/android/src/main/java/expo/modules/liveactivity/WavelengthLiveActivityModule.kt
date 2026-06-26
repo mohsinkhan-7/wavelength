@@ -1,11 +1,10 @@
 package expo.modules.liveactivity
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
-import androidx.core.app.NotificationCompat
+import android.content.Intent
+import android.os.Bundle
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -13,6 +12,8 @@ import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 
 // Mirrors the iOS NowPlayingArgs record so the same JS state object maps cleanly.
+// The numeric `*Sec` fields, `artworkUrl` and `canNext/canPrev` are Android-only;
+// iOS simply doesn't declare them in its Record and ignores them.
 class NowPlayingArgs : Record {
   @Field var title: String = ""
   @Field var artist: String = ""
@@ -20,93 +21,104 @@ class NowPlayingArgs : Record {
   @Field var progress: Double = 0.0 // 0..1
   @Field var position: String = "0:00"
   @Field var duration: String = "0:00"
+  @Field var positionSec: Double = 0.0
+  @Field var durationSec: Double = 0.0
+  @Field var artworkUrl: String? = null
+  @Field var canNext: Boolean = false
+  @Field var canPrev: Boolean = false
 }
 
 /**
  * Android counterpart of the iOS Live Activity. Shares the JS module name
  * ("WavelengthLiveActivity") so one JS surface drives both platforms.
  *
- * expo-audio already posts the standard MediaStyle media notification (lock
- * screen + media controls), so this module posts ONLY the Android 16 "Live
- * Update" — a promoted-ongoing ProgressStyle notification that surfaces as a
- * status-bar chip near the camera cutout. Below API 36 it is a hard no-op to
- * avoid duplicating expo-audio's card.
+ * Unlike before, this module now OWNS the full Android media notification: it
+ * runs a foreground [MediaPlaybackService] hosting a MediaSessionCompat and posts
+ * a MediaStyle notification with prev / play-pause / next + a seek bar + artwork.
+ * expo-audio's own lock-screen controls are intentionally NOT activated on Android
+ * (see AudioController) so there is exactly one media surface — and one that
+ * exposes real track-skip, which expo-audio deliberately omits.
+ *
+ * Control taps (notification, lock screen, Bluetooth/headset) are surfaced to JS
+ * via the "onMediaAction" event, which drives the player store.
  */
 class WavelengthLiveActivityModule : Module() {
-
-  private val channelId = "wavelength_live_update"
-  private val notifId = 47110815
 
   private val context: Context
     get() = requireNotNull(appContext.reactContext) { "React context unavailable" }
 
-  // Android 16 = API 36. Promoted-ongoing Live Updates only exist here.
-  private val liveUpdatesAvailable: Boolean
-    get() = Build.VERSION.SDK_INT >= 36
-
   override fun definition() = ModuleDefinition {
     Name("WavelengthLiveActivity")
 
-    // Supported only on Android 16+ AND when notifications are enabled.
+    Events("onMediaAction")
+
+    OnCreate { instance = this@WavelengthLiveActivityModule }
+    OnDestroy { if (instance === this@WavelengthLiveActivityModule) instance = null }
+
+    // Supported whenever the user has notifications enabled for the app.
     Function("isSupported") {
-      liveUpdatesAvailable && NotificationManagerCompat.from(context).areNotificationsEnabled()
+      NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
     AsyncFunction("startActivity") { args: NowPlayingArgs, promise: Promise ->
-      if (!liveUpdatesAvailable || !NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+      if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
         promise.resolve(null) // matches the iOS "not supported" path
         return@AsyncFunction
       }
-      ensureChannel()
-      postChip(args)
-      promise.resolve(mapOf("id" to notifId.toString()))
+      NowPlayingStore.current = args.toData()
+      sendToService(MediaPlaybackService.ACTION_START)
+      promise.resolve(mapOf("id" to SESSION_ID))
     }
 
     AsyncFunction("updateActivity") { _: String, args: NowPlayingArgs, promise: Promise ->
-      if (!liveUpdatesAvailable) {
-        promise.resolve(false)
-        return@AsyncFunction
-      }
-      postChip(args) // re-notify with the same id = in-place update
+      NowPlayingStore.current = args.toData()
+      sendToService(MediaPlaybackService.ACTION_UPDATE)
       promise.resolve(true)
     }
 
     AsyncFunction("endActivity") { _: String, promise: Promise ->
-      NotificationManagerCompat.from(context).cancel(notifId)
+      sendToService(MediaPlaybackService.ACTION_STOP)
       promise.resolve(true)
     }
   }
 
-  private fun ensureChannel() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      // IMPORTANCE_LOW: ongoing progress, never buzz/heads-up on each tick.
-      val channel = NotificationChannel(channelId, "Now Playing", NotificationManager.IMPORTANCE_LOW).apply {
-        description = "Live progress for the currently playing track"
-        setShowBadge(false)
-      }
-      (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-        .createNotificationChannel(channel)
+  private fun sendToService(action: String) {
+    val intent = Intent(context, MediaPlaybackService::class.java).apply { this.action = action }
+    if (action == MediaPlaybackService.ACTION_START) {
+      // Must promote to foreground promptly; startForegroundService requires the
+      // service to call startForeground() within a few seconds.
+      ContextCompat.startForegroundService(context, intent)
+    } else {
+      context.startService(intent)
     }
   }
 
-  private fun postChip(a: NowPlayingArgs) {
-    val pct = (a.progress.coerceIn(0.0, 1.0) * 100).toInt()
+  companion object {
+    const val SESSION_ID = "android-media"
 
-    val builder = NotificationCompat.Builder(context, channelId)
-      .setSmallIcon(android.R.drawable.ic_media_play) // TODO: swap for a branded monochrome icon
-      .setContentTitle(a.title)
-      .setContentText("${a.artist} • ${a.position} / ${a.duration}")
-      .setOngoing(a.isPlaying)
-      .setOnlyAlertOnce(true)
-      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-      // NOTE: the Android 16 "Live Update" APIs (NotificationCompat.ProgressStyle,
-      // setShortCriticalText, setRequestPromotedOngoing) do NOT resolve against the
-      // androidx.core version that actually lands in this RN/Expo build, so we post a
-      // standard ongoing notification with a classic progress bar instead. This is an
-      // optional surface — expo-audio already posts the main media notification on
-      // Android. Restore the promoted Live Update once core 1.16.0+ resolves cleanly.
-      .setProgress(100, pct, false)
+    // Set while the JS module is alive so the foreground service can surface
+    // control events back to JS. Volatile: written/read across threads.
+    @Volatile
+    var instance: WavelengthLiveActivityModule? = null
 
-    NotificationManagerCompat.from(context).notify(notifId, builder.build())
+    /** Called by the service (main thread) when a transport control is used. */
+    fun emitAction(action: String, value: Double?) {
+      val body = Bundle().apply {
+        putString("action", action)
+        if (value != null) putDouble("value", value)
+      }
+      instance?.sendEvent("onMediaAction", body)
+    }
   }
 }
+
+private fun NowPlayingArgs.toData() = NowPlayingData(
+  title = title,
+  artist = artist,
+  isPlaying = isPlaying,
+  positionMs = (positionSec * 1000).toLong().coerceAtLeast(0),
+  durationMs = (durationSec * 1000).toLong().coerceAtLeast(0),
+  artworkUrl = artworkUrl?.takeIf { it.isNotBlank() },
+  canNext = canNext,
+  canPrev = canPrev,
+)

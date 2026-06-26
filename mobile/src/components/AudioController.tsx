@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import {
   setAudioModeAsync,
   useAudioPlayer,
@@ -7,7 +8,12 @@ import {
 import { usePlayer, registerSeek } from '@/store/player';
 import { resolvePlaybackUri } from '@/store/library';
 import { formatTime } from '@/lib/format';
-import { syncNowPlaying, endNowPlaying, ensureNotificationPermission } from '../../modules/live-activity';
+import {
+  syncNowPlaying,
+  endNowPlaying,
+  ensureNotificationPermission,
+  addMediaActionListener,
+} from '../../modules/live-activity';
 
 let nowPlayingPermRequested = false;
 
@@ -23,6 +29,12 @@ function nowPlayingState() {
     progress: s.duration > 0 ? s.position / s.duration : 0,
     position: formatTime(s.position),
     duration: formatTime(s.duration),
+    // Android MediaSession (seek bar + skip buttons); iOS ignores these.
+    positionSec: s.position,
+    durationSec: s.duration,
+    artworkUrl: t.artwork || undefined,
+    canNext: s.index < s.queue.length - 1 || s.repeat === 'all',
+    canPrev: true,
   };
 }
 
@@ -82,30 +94,35 @@ export default function AudioController() {
     player.replace({ uri });
     player.play();
 
-    // Publish to the iOS Now Playing info center — this is what populates the
-    // lock screen AND the Dynamic Island media presentation (and the Android
-    // notification / web MediaSession). Register once, then just update.
-    const metadata = {
-      title: track.title,
-      artist: track.artist,
-      artworkUrl: track.artwork || undefined,
-    };
-    try {
-      if (!lockScreenActive.current) {
-        player.setActiveForLockScreen?.(true, metadata, {
-          showSeekForward: true,
-          showSeekBackward: true,
-        });
-        lockScreenActive.current = true;
-      } else {
-        player.updateLockScreenMetadata?.(metadata);
+    // iOS: publish to the Now Playing info center — this populates the lock
+    // screen AND the Dynamic Island media presentation. Register once, then
+    // just update. On Android we deliberately DON'T activate expo-audio's
+    // lock-screen controls: our own MediaSession (modules/live-activity) owns
+    // the notification so it can expose real prev/next track buttons, which
+    // expo-audio omits. Two surfaces would otherwise both appear.
+    if (Platform.OS === 'ios') {
+      const metadata = {
+        title: track.title,
+        artist: track.artist,
+        artworkUrl: track.artwork || undefined,
+      };
+      try {
+        if (!lockScreenActive.current) {
+          player.setActiveForLockScreen?.(true, metadata, {
+            showSeekForward: true,
+            showSeekBackward: true,
+          });
+          lockScreenActive.current = true;
+        } else {
+          player.updateLockScreenMetadata?.(metadata);
+        }
+      } catch {
+        /* lock screen unsupported on this platform — ignore */
       }
-    } catch {
-      /* lock screen unsupported on this platform — ignore */
     }
 
     // Start / refresh the platform now-playing surface (iOS Dynamic Island /
-    // Android 16 Live Update chip) for the new track. Request the Android
+    // Android media notification) for the new track. Request the Android
     // notification permission once, on first play, then sync.
     if (!nowPlayingPermRequested) {
       nowPlayingPermRequested = true;
@@ -135,6 +152,49 @@ export default function AudioController() {
     if (status.didJustFinish) onFinish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status.didJustFinish]);
+
+  // Drive the store from native media controls (Android lock screen /
+  // notification / Bluetooth & headset buttons). No-ops on iOS/web.
+  useEffect(() => {
+    const sub = addMediaActionListener((e) => {
+      const p = usePlayer.getState();
+      switch (e.action) {
+        case 'play':
+          p.setPlaying(true);
+          break;
+        case 'pause':
+          p.setPlaying(false);
+          break;
+        case 'toggle':
+          p.toggle();
+          break;
+        case 'next':
+          p.next();
+          break;
+        case 'prev':
+          p.prev();
+          break;
+        case 'seek':
+          if (typeof e.value === 'number') p.seek(e.value);
+          break;
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Mirror an externally-forced pause back into the store (e.g. audio-focus
+  // loss when another app starts playing, or a phone call). Only the pause
+  // direction is mirrored — play/seek/skip are always store-driven — and the
+  // end-of-track gap is skipped so it doesn't fight onFinish.
+  useEffect(() => {
+    if (!loadedTrackId.current) return;
+    if (!status.isLoaded || status.isBuffering || status.didJustFinish) return;
+    const s = usePlayer.getState();
+    if (s.isPlaying && !status.playing) {
+      if (status.duration > 0 && status.currentTime >= status.duration - 1) return;
+      s.setPlaying(false);
+    }
+  }, [status.playing, status.isLoaded, status.isBuffering, status.didJustFinish, status.currentTime, status.duration]);
 
   return null;
 }

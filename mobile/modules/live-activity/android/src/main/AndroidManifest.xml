@@ -1,1 +1,17 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Foreground service that hosts the MediaSessionCompat and posts the media
+      notification. mediaPlayback type + the MEDIA_BUTTON filter let it receive
+      hardware / Bluetooth transport keys and bind the lock-screen controls.
+    -->
+    <service
+      android:name="expo.modules.liveactivity.MediaPlaybackService"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback">
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+      </intent-filter>
+    </service>
+  </application>
+</manifest>

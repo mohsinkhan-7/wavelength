@@ -19,7 +19,7 @@ android {
 }
 
 dependencies {
-  // 1.16.0 ships the Android 16 notification APIs we use:
-  // NotificationCompat.ProgressStyle, setRequestPromotedOngoing, setShortCriticalText.
   implementation 'androidx.core:core-ktx:1.16.0'
+  // MediaSessionCompat + MediaStyle notification + MediaButtonReceiver.
+  implementation 'androidx.media:media:1.7.0'
 }
