@@ -158,8 +158,9 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   removeDownload: async (trackId) => {
     if (!DOWNLOADS_SUPPORTED) return;
+    const existing = get().downloads.find((t) => t.id === trackId);
     try {
-      await deleteDownload(trackId);
+      if (existing?.localUri) await deleteDownload(existing.localUri);
     } catch {
       /* file may already be gone */
     }
