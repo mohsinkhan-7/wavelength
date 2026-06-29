@@ -1,17 +1,21 @@
 import { create } from 'zustand';
 import type { RepeatMode, Track } from '@/types';
 
-// The audio engine (AudioController) registers an imperative seek here so the
-// UI can scrub without the store needing a direct reference to the player.
 let seekFn: ((seconds: number) => void) | null = null;
 export function registerSeek(fn: (seconds: number) => void) {
   seekFn = fn;
 }
 
+// Radio fetcher: registered by the root layout, called when the queue is nearly
+// exhausted so the app can append similar tracks without stopping playback.
+let radioFetchFn: ((track: Track) => Promise<Track[]>) | null = null;
+export function registerRadioFetcher(fn: (track: Track) => Promise<Track[]>) {
+  radioFetchFn = fn;
+}
+
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    // Math.random is fine here (cosmetic ordering, not in a workflow script).
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
@@ -27,6 +31,8 @@ type PlayerState = {
   duration: number; // seconds
   shuffle: boolean;
   repeat: RepeatMode;
+  sleepTimerEndsAt: number | null; // wall-clock ms
+  radioMode: boolean;
 
   current: () => Track | null;
 
@@ -39,6 +45,9 @@ type PlayerState = {
   seek: (seconds: number) => void;
   setShuffle: (on: boolean) => void;
   cycleRepeat: () => void;
+  setSleepTimer: (minutes: number | null) => void;
+  appendToQueue: (tracks: Track[]) => void;
+  setRadioMode: (on: boolean) => void;
 
   // Called by the audio engine:
   onFinish: () => void;
@@ -54,6 +63,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   duration: 0,
   shuffle: false,
   repeat: 'off',
+  sleepTimerEndsAt: null,
+  radioMode: false,
 
   current: () => {
     const { queue, index } = get();
@@ -78,11 +89,32 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   setPlaying: (playing) => set({ isPlaying: playing }),
 
   next: () => {
-    const { index, queue, repeat } = get();
+    const { index, queue, repeat, radioMode } = get();
     if (index < queue.length - 1) {
-      set({ index: index + 1, position: 0, isPlaying: true });
+      const newIndex = index + 1;
+      set({ index: newIndex, position: 0, isPlaying: true });
+      // Prefetch more tracks when 2 away from the end.
+      if (radioMode && newIndex >= queue.length - 2 && radioFetchFn) {
+        const current = queue[newIndex];
+        radioFetchFn(current)
+          .then((tracks) => get().appendToQueue(tracks))
+          .catch(() => {});
+      }
     } else if (repeat === 'all') {
       set({ index: 0, position: 0, isPlaying: true });
+    } else if (radioMode && radioFetchFn) {
+      // Queue exhausted in radio mode — fetch then advance.
+      const current = queue[index];
+      radioFetchFn(current)
+        .then((tracks) => {
+          if (tracks.length) {
+            get().appendToQueue(tracks);
+            set({ index: index + 1, position: 0, isPlaying: true });
+          } else {
+            set({ isPlaying: false });
+          }
+        })
+        .catch(() => set({ isPlaying: false }));
     } else {
       set({ isPlaying: false });
     }
@@ -90,7 +122,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   prev: () => {
     const { index, position } = get();
-    // Restart current track if we're more than 3s in, otherwise go back.
     if (position > 3 || index === 0) {
       seekFn?.(0);
       set({ position: 0 });
@@ -124,6 +155,19 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ repeat: next });
   },
 
+  setSleepTimer: (minutes) => {
+    set({ sleepTimerEndsAt: minutes === null ? null : Date.now() + minutes * 60 * 1000 });
+  },
+
+  appendToQueue: (tracks) => {
+    const { queue } = get();
+    const existingIds = new Set(queue.map((t) => t.id));
+    const fresh = tracks.filter((t) => !existingIds.has(t.id));
+    if (fresh.length) set({ queue: [...queue, ...fresh] });
+  },
+
+  setRadioMode: (on) => set({ radioMode: on }),
+
   onFinish: () => {
     if (get().repeat === 'one') {
       seekFn?.(0);
@@ -133,5 +177,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }
   },
 
-  setStatus: (position, duration) => set({ position, duration }),
+  setStatus: (position, duration) => {
+    const { sleepTimerEndsAt } = get();
+    if (sleepTimerEndsAt !== null && Date.now() >= sleepTimerEndsAt) {
+      set({ isPlaying: false, sleepTimerEndsAt: null, position, duration });
+      return;
+    }
+    set({ position, duration });
+  },
 }));

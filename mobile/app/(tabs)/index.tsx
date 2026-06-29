@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GENRE_ROWS, getTrending, getUndergroundTrending, searchTracks } from '@/api/audius';
+import { GENRE_ROWS, getTrending, getUndergroundTrending, getUserTracks, searchTracks } from '@/api/audius';
 import { getJamendoLatest, getJamendoPopular, getJamendoTracks } from '@/api/jamendo';
 import { getJioSaavnTrending } from '@/api/jiosaavn';
 import { getArchiveBollywood } from '@/api/archive';
 import AppBackground from '@/components/AppBackground';
 import Section from '@/components/Section';
 import { useAuth } from '@/store/auth';
+import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useUI } from '@/store/ui';
 import { colors, font, fonts, spacing } from '@/theme';
@@ -17,8 +18,6 @@ const PAGE = 20;
 
 type Feed = { key: string; title: string; fetch: (offset: number) => Promise<Track[]> };
 
-// Language / region rows — surfaced from Audius search so the free, full-length
-// catalog spans many languages (independent/regional artists, remixes, covers).
 const LANGUAGE_ROWS: { key: string; title: string; query: string }[] = [
   { key: 'lang-hindi', title: 'Bollywood & Hindi', query: 'bollywood' },
   { key: 'lang-punjabi', title: 'Punjabi', query: 'punjabi' },
@@ -28,8 +27,6 @@ const LANGUAGE_ROWS: { key: string; title: string; query: string }[] = [
   { key: 'lang-afro', title: 'Afrobeats', query: 'afrobeats' },
 ];
 
-// Jamendo genre/mood rows — full-length, downloadable Creative-Commons tracks
-// filtered by Jamendo tag (fuzzytags) and ordered by monthly popularity.
 const JAMENDO_GENRE_ROWS: { key: string; title: string; tag: string }[] = [
   { key: 'jam-chillout', title: 'Chillout', tag: 'chillout' },
   { key: 'jam-electronic', title: 'Electronic', tag: 'electronic' },
@@ -72,11 +69,19 @@ export default function Home() {
   const playQueue = usePlayer((s) => s.playQueue);
   const openActions = useUI((s) => s.openTrackActions);
 
+  const history = useLibrary((s) => s.history);
+  const liked = useLibrary((s) => s.liked);
+  const followedArtists = useLibrary((s) => s.followedArtists);
+
   const [feeds, setFeeds] = useState<Record<string, Track[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Per-row pagination bookkeeping (kept in a ref to dodge stale closures).
+  // Dynamic sections loaded independently
+  const [forYouTracks, setForYouTracks] = useState<Track[]>([]);
+  const [followFeedTracks, setFollowFeedTracks] = useState<Track[]>([]);
+  const [dynamicLoading, setDynamicLoading] = useState(false);
+
   const meta = useRef<Record<string, { loading: boolean; done: boolean; count: number }>>({});
 
   const loadMore = useCallback(async (feed: Feed, reset = false) => {
@@ -107,9 +112,48 @@ export default function Home() {
     loadInitial().finally(() => setLoading(false));
   }, [loadInitial]);
 
+  // Load dynamic sections: For You + Artist Follow feed
+  const loadDynamic = useCallback(async () => {
+    setDynamicLoading(true);
+    try {
+      // For You: search by the user's top 2 liked artists
+      const likedIds = new Set(liked.map((t) => t.id));
+      const topArtists = [...new Map(liked.map((t) => [t.artist, t])).values()].slice(0, 2);
+      const forYouResults = await Promise.allSettled(
+        topArtists.map((t) => searchTracks(t.artist, 12, 0))
+      );
+      const forYou = forYouResults
+        .flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+        .filter((t) => !likedIds.has(t.id));
+      const deduped = [...new Map(forYou.map((t) => [t.id, t])).values()].slice(0, 30);
+      setForYouTracks(deduped);
+
+      // From Artists You Follow: fetch tracks for each followed Audius artist
+      const audiusFollows = followedArtists.filter((a) => a.source === 'audius').slice(0, 4);
+      const followResults = await Promise.allSettled(
+        audiusFollows.map((a) => getUserTracks(a.artistId, 'date', 8, 0))
+      );
+      const followTracks = followResults
+        .flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+        .filter((t) => !likedIds.has(t.id));
+      const followDeduped = [...new Map(followTracks.map((t) => [t.id, t])).values()].slice(0, 30);
+      setFollowFeedTracks(followDeduped);
+    } catch {
+      /* ignore — optional sections */
+    } finally {
+      setDynamicLoading(false);
+    }
+  }, [liked, followedArtists]);
+
+  useEffect(() => {
+    if (liked.length > 0 || followedArtists.length > 0) {
+      loadDynamic();
+    }
+  }, []); // load once on mount; user can pull-to-refresh for updates
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadInitial();
+    await Promise.allSettled([loadInitial(), loadDynamic()]);
     setRefreshing(false);
   };
 
@@ -131,6 +175,40 @@ export default function Home() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xxl }}
       >
+        {/* Recently Played — from local history, shown immediately */}
+        {history.length > 0 && (
+          <Section
+            title="Recently Played"
+            tracks={history.slice(0, 20)}
+            loading={false}
+            onPlay={playQueue}
+            onMore={openActions}
+          />
+        )}
+
+        {/* For You — personalised from liked artists */}
+        {forYouTracks.length > 0 && (
+          <Section
+            title="For You"
+            tracks={forYouTracks}
+            loading={dynamicLoading && forYouTracks.length === 0}
+            onPlay={playQueue}
+            onMore={openActions}
+          />
+        )}
+
+        {/* New from Artists You Follow */}
+        {followFeedTracks.length > 0 && (
+          <Section
+            title="From Artists You Follow"
+            tracks={followFeedTracks}
+            loading={dynamicLoading && followFeedTracks.length === 0}
+            onPlay={playQueue}
+            onMore={openActions}
+          />
+        )}
+
+        {/* Static catalog feeds */}
         {FEEDS.map((f) => (
           <Section
             key={f.key}

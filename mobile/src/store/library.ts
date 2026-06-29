@@ -4,11 +4,10 @@ import { create } from 'zustand';
 import * as api from '@/api/backend';
 import { getStreamUrl } from '@/api/audius';
 import { deleteDownload, downloadTrackFile } from '@/lib/downloads';
-import type { Playlist, Track, User } from '@/types';
+import type { FollowedArtist, Playlist, Track, User } from '@/types';
 
 const DOWNLOADS_KEY = 'wavelength.downloads';
 
-// Offline downloads rely on the native filesystem; they're unavailable on web.
 const DOWNLOADS_SUPPORTED = Platform.OS !== 'web';
 
 function notify(title: string, message: string) {
@@ -22,8 +21,10 @@ function notify(title: string, message: string) {
 type LibraryState = {
   liked: Track[];
   playlists: Playlist[];
-  downloads: Track[]; // each has localUri set
-  downloadProgress: Record<string, number>; // trackId -> 0..1 while downloading
+  downloads: Track[];
+  downloadProgress: Record<string, number>;
+  history: Track[];
+  followedArtists: FollowedArtist[];
 
   hydrate: (user: User | null) => Promise<void>;
   clear: () => void;
@@ -43,6 +44,16 @@ type LibraryState = {
   isDownloaded: (trackId: string) => boolean;
   download: (track: Track) => Promise<void>;
   removeDownload: (trackId: string) => Promise<void>;
+
+  // History
+  recordPlay: (track: Track) => void;
+  loadHistory: () => Promise<void>;
+
+  // Artist follows
+  isFollowing: (artistId: string) => boolean;
+  followArtist: (artist: FollowedArtist) => Promise<void>;
+  unfollowArtist: (artistId: string) => Promise<void>;
+  loadFollowedArtists: () => Promise<void>;
 };
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -50,11 +61,12 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   playlists: [],
   downloads: [],
   downloadProgress: {},
+  history: [],
+  followedArtists: [],
 
   hydrate: async (user) => {
     set({ liked: user?.likedSongs ?? [] });
 
-    // Load offline downloads manifest from device storage.
     try {
       const json = await AsyncStorage.getItem(DOWNLOADS_KEY);
       set({ downloads: json ? (JSON.parse(json) as Track[]) : [] });
@@ -62,37 +74,35 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       set({ downloads: [] });
     }
 
-    // Pull playlists from the backend (cloud sync).
     if (user) {
-      try {
-        const { playlists } = await api.listPlaylists();
-        set({ playlists });
-      } catch {
-        /* offline — keep whatever we have */
-      }
+      await Promise.allSettled([
+        api.listPlaylists().then(({ playlists }) => set({ playlists })),
+        api.getHistory(50).then(({ history }) => set({ history })),
+        api.getFollowedArtists().then(({ followedArtists }) => set({ followedArtists })),
+      ]);
     }
   },
 
-  clear: () => set({ liked: [], playlists: [], downloads: [], downloadProgress: {} }),
+  clear: () =>
+    set({ liked: [], playlists: [], downloads: [], downloadProgress: {}, history: [], followedArtists: [] }),
 
   isLiked: (trackId) => get().liked.some((t) => t.id === trackId),
 
   toggleLike: async (track) => {
     const liked = get().isLiked(track.id);
-    // Optimistic update
     if (liked) {
       set({ liked: get().liked.filter((t) => t.id !== track.id) });
       try {
         await api.unlikeTrack(track.id);
       } catch {
-        set({ liked: [track, ...get().liked] }); // rollback
+        set({ liked: [track, ...get().liked] });
       }
     } else {
       set({ liked: [track, ...get().liked] });
       try {
         await api.likeTrack(track);
       } catch {
-        set({ liked: get().liked.filter((t) => t.id !== track.id) }); // rollback
+        set({ liked: get().liked.filter((t) => t.id !== track.id) });
       }
     }
   },
@@ -130,7 +140,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (track.previewOnly) {
       notify(
         'Preview only',
-        'This is a 30-second preview from Deezer and can’t be saved offline. Full tracks from Audius can be downloaded.'
+        'This is a 30-second preview from Deezer and can't be saved offline. Full tracks from Audius can be downloaded.'
       );
       return;
     }
@@ -168,9 +178,57 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     set({ downloads: next });
     await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
   },
+
+  // Fire-and-forget: update local history immediately, sync to server in background.
+  recordPlay: (track) => {
+    const prev = get().history;
+    // Deduplicate: don't record same track twice in a row.
+    if (prev[0]?.id === track.id) return;
+    set({ history: [track, ...prev].slice(0, 100) });
+    api.addToHistory(track).catch(() => {});
+  },
+
+  loadHistory: async () => {
+    try {
+      const { history } = await api.getHistory(50);
+      set({ history });
+    } catch {
+      /* offline — keep local state */
+    }
+  },
+
+  isFollowing: (artistId) => get().followedArtists.some((a) => a.artistId === artistId),
+
+  followArtist: async (artist) => {
+    if (get().isFollowing(artist.artistId)) return;
+    set({ followedArtists: [...get().followedArtists, artist] });
+    try {
+      await api.followArtist(artist);
+    } catch {
+      set({ followedArtists: get().followedArtists.filter((a) => a.artistId !== artist.artistId) });
+    }
+  },
+
+  unfollowArtist: async (artistId) => {
+    const prev = get().followedArtists;
+    set({ followedArtists: prev.filter((a) => a.artistId !== artistId) });
+    try {
+      await api.unfollowArtist(artistId);
+    } catch {
+      set({ followedArtists: prev });
+    }
+  },
+
+  loadFollowedArtists: async () => {
+    try {
+      const { followedArtists } = await api.getFollowedArtists();
+      set({ followedArtists });
+    } catch {
+      /* offline */
+    }
+  },
 }));
 
-// Helper exported for the player: prefer a local file if the track is downloaded.
 export function resolvePlaybackUri(track: Track): string | undefined {
   const dl = useLibrary.getState().downloads.find((t) => t.id === track.id);
   if (dl?.localUri) return dl.localUri;

@@ -8,8 +8,10 @@ import AppBackground from '@/components/AppBackground';
 import { patchTextFonts } from '@/lib/textFont';
 import AudioController from '@/components/AudioController';
 import TrackActionsSheet from '@/components/TrackActionsSheet';
+import { searchTracks } from '@/api/audius';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
+import { registerRadioFetcher } from '@/store/player';
 import { colors } from '@/theme';
 
 // Route all <Text> through Inter (weight-aware) once, before any render.
@@ -35,6 +37,18 @@ export default function RootLayout() {
 
   const segments = useSegments();
   const router = useRouter();
+
+  // Register the radio fetcher once. Searches Audius by artist name to auto-extend the queue.
+  useEffect(() => {
+    registerRadioFetcher(async (track) => {
+      try {
+        const results = await searchTracks(track.artist, 20, 0);
+        return results.filter((t) => t.id !== track.id);
+      } catch {
+        return [];
+      }
+    });
+  }, []);
 
   // Restore saved session on launch.
   useEffect(() => {

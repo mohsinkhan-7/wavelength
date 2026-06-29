@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +43,10 @@ export default function PlayerScreen() {
   const seek = usePlayer((s) => s.seek);
   const setShuffle = usePlayer((s) => s.setShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
+  const sleepTimerEndsAt = usePlayer((s) => s.sleepTimerEndsAt);
+  const setSleepTimer = usePlayer((s) => s.setSleepTimer);
+  const radioMode = usePlayer((s) => s.radioMode);
+  const setRadioMode = usePlayer((s) => s.setRadioMode);
 
   const openActions = useUI((s) => s.openTrackActions);
   const isLiked = useLibrary((s) => (track ? s.isLiked(track.id) : false));
@@ -56,6 +60,11 @@ export default function PlayerScreen() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [showSleepPicker, setShowSleepPicker] = useState(false);
+
+  const sleepMinutesLeft = sleepTimerEndsAt !== null
+    ? Math.max(1, Math.ceil((sleepTimerEndsAt - Date.now()) / 60000))
+    : null;
 
   const trackId = track?.id;
   const artwork = track?.artwork;
@@ -287,7 +296,41 @@ export default function PlayerScreen() {
             </Text>
           </Pressable>
         )}
+        <View style={styles.extraControls}>
+          <Pressable onPress={() => setShowSleepPicker(true)} hitSlop={8}>
+            <Text style={[styles.extraBtn, sleepTimerEndsAt !== null ? { color: tint } : null]}>
+              {sleepMinutesLeft !== null ? `⏱ ${sleepMinutesLeft}m` : '⏱ Sleep'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setRadioMode(!radioMode)} hitSlop={8}>
+            <Text style={[styles.extraBtn, radioMode ? { color: tint } : null]}>
+              {'📻'} {radioMode ? 'Radio On' : 'Radio'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
+
+      {/* Sleep timer picker */}
+      <Modal visible={showSleepPicker} transparent animationType="fade" onRequestClose={() => setShowSleepPicker(false)}>
+        <Pressable style={styles.sleepBackdrop} onPress={() => setShowSleepPicker(false)} />
+        <View style={styles.sleepSheet}>
+          <Text style={styles.sleepTitle}>Sleep Timer</Text>
+          {[15, 30, 45, 60].map((m) => (
+            <Pressable
+              key={m}
+              style={[styles.sleepOption, sleepMinutesLeft !== null && Math.abs(sleepMinutesLeft - m) < 2 && { backgroundColor: tint + '22' }]}
+              onPress={() => { setSleepTimer(m); setShowSleepPicker(false); }}
+            >
+              <Text style={styles.sleepOptionText}>{m} minutes</Text>
+            </Pressable>
+          ))}
+          {sleepTimerEndsAt !== null && (
+            <Pressable style={styles.sleepOption} onPress={() => { setSleepTimer(null); setShowSleepPicker(false); }}>
+              <Text style={[styles.sleepOptionText, { color: colors.textMuted }]}>Turn off</Text>
+            </Pressable>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -344,7 +387,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadow,
   },
-  bottomRow: { alignItems: 'center', marginTop: spacing.lg },
+  bottomRow: { alignItems: 'center', marginTop: spacing.lg, gap: spacing.md },
   downloadBtn: { color: colors.primary, fontSize: font.body, fontWeight: '700' },
   downloadedTag: { color: colors.textMuted, fontSize: font.small },
+  extraControls: { flexDirection: 'row', gap: spacing.xl },
+  extraBtn: { color: colors.textMuted, fontSize: font.small, fontWeight: '700' },
+  sleepBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sleepSheet: {
+    backgroundColor: colors.glass,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.xl,
+    borderTopWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  sleepTitle: { color: colors.text, fontSize: font.body, fontWeight: '800', marginBottom: spacing.md, textAlign: 'center' },
+  sleepOption: {
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+  },
+  sleepOptionText: { color: colors.text, fontSize: font.body, textAlign: 'center' },
 });

@@ -8,6 +8,7 @@ import { getDeezerArtist, resolveDeezerPreview } from '@/api/deezer';
 import { getJamendoArtist } from '@/api/jamendo';
 import AppBackground from '@/components/AppBackground';
 import TrackRow from '@/components/TrackRow';
+import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useUI } from '@/store/ui';
 import { colors, font, gradients, radius, spacing } from '@/theme';
@@ -20,6 +21,10 @@ export default function ArtistScreen() {
   const playQueue = usePlayer((s) => s.playQueue);
   const setShuffle = usePlayer((s) => s.setShuffle);
   const openActions = useUI((s) => s.openTrackActions);
+
+  const isFollowing = useLibrary((s) => s.isFollowing(rawId));
+  const followArtist = useLibrary((s) => s.followArtist);
+  const unfollowArtist = useLibrary((s) => s.unfollowArtist);
 
   const sep = (id ?? '').indexOf(':');
   const source = sep > 0 ? (id as string).slice(0, sep) : 'audius';
@@ -72,6 +77,14 @@ export default function ArtistScreen() {
 
   const initial = name.trim().charAt(0).toUpperCase() || '♪';
 
+  const handleFollow = () => {
+    if (isFollowing) {
+      unfollowArtist(rawId);
+    } else {
+      followArtist({ artistId: rawId, name, source: source as any });
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <AppBackground />
@@ -101,6 +114,14 @@ export default function ArtistScreen() {
               {source === 'deezer' ? 'Deezer · previews' : source === 'jamendo' ? 'Jamendo' : 'Audius'} ·{' '}
               {tracks.length} tracks
             </Text>
+            <Pressable
+              style={[styles.followBtn, isFollowing && styles.followingBtn]}
+              onPress={handleFollow}
+            >
+              <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                {isFollowing ? 'Following ✓' : '+ Follow'}
+              </Text>
+            </Pressable>
             {tracks.length > 0 && (
               <View style={styles.actions}>
                 <Pressable style={styles.playBtn} onPress={() => playFrom(tracks, 0)}>
@@ -176,4 +197,18 @@ const styles = StyleSheet.create({
   },
   shuffleText: { color: colors.text, fontWeight: '700', fontSize: font.body },
   empty: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.xxl, fontSize: font.body },
+  followBtn: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glass,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xl,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followBtnText: { color: colors.text, fontWeight: '700', fontSize: font.small },
+  followingBtn: { borderColor: colors.primary, backgroundColor: 'transparent' },
+  followingBtnText: { color: colors.primary },
 });

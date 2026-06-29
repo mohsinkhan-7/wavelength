@@ -33,3 +33,17 @@ export type User = {
 };
 
 export type RepeatMode = 'off' | 'all' | 'one';
+
+export type FollowedArtist = {
+  artistId: string;
+  name: string;
+  source: TrackSource;
+};
+
+export type Stats = {
+  totalPlays: number;
+  totalMinutes: number;
+  topArtists: { name: string; count: number }[];
+  topSources: { source: string; count: number }[];
+  dailyActivity: { date: string; count: number }[];
+};

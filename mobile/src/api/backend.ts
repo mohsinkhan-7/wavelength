@@ -1,5 +1,5 @@
 import { API_BASE } from '@/config';
-import type { Playlist, Track, TrackSource, User } from '@/types';
+import type { FollowedArtist, Playlist, Stats, Track, TrackSource, User } from '@/types';
 
 // The JWT is injected by the auth store after login/restore.
 let authToken: string | null = null;
@@ -142,4 +142,42 @@ export async function removeTrackFromPlaylist(id: string, trackId: string) {
     { method: 'DELETE' }
   );
   return { playlist: normPlaylist(data.playlist) };
+}
+
+// ---- History ----
+
+export async function addToHistory(track: Track) {
+  return request<{ ok: boolean }>('/api/me/history', {
+    method: 'POST',
+    body: JSON.stringify(snapshot(track)),
+  });
+}
+
+export async function getHistory(limit = 50) {
+  const data = await request<{ history: any[] }>(`/api/me/history?limit=${limit}`);
+  return { history: data.history.map(fromSnapshot) };
+}
+
+export async function getStats() {
+  return request<Stats>('/api/me/stats');
+}
+
+// ---- Artist follows ----
+
+export async function getFollowedArtists() {
+  return request<{ followedArtists: FollowedArtist[] }>('/api/me/followed-artists');
+}
+
+export async function followArtist(artist: FollowedArtist) {
+  return request<{ followedArtists: FollowedArtist[] }>('/api/me/followed-artists', {
+    method: 'POST',
+    body: JSON.stringify(artist),
+  });
+}
+
+export async function unfollowArtist(artistId: string) {
+  return request<{ followedArtists: FollowedArtist[] }>(
+    `/api/me/followed-artists/${encodeURIComponent(artistId)}`,
+    { method: 'DELETE' }
+  );
 }

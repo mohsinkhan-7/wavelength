@@ -3,6 +3,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -41,6 +42,18 @@ export default function TrackActionsSheet() {
     close();
   };
 
+  const handleShare = async () => {
+    if (!track) return;
+    try {
+      await Share.share({
+        message: `Listen to "${track.title}" by ${track.artist} on Wavelength\nwavelength://song/${track.id}`,
+        url: `wavelength://song/${track.id}`, // iOS share sheet picks this up as the URL
+      });
+    } catch {
+      /* user cancelled or share unavailable */
+    }
+  };
+
   const handleCreate = async () => {
     if (!newName.trim()) return;
     const p = await createPlaylist(newName.trim());
@@ -77,6 +90,12 @@ export default function TrackActionsSheet() {
             label={isLiked ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
             tint={isLiked ? colors.like : colors.text}
             onPress={() => toggleLike(track)}
+          />
+
+          <Action
+            icon="share-social-outline"
+            label="Share"
+            onPress={handleShare}
           />
 
           {track.artistId && (

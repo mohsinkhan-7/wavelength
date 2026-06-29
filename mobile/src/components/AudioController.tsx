@@ -6,7 +6,7 @@ import {
   useAudioPlayerStatus,
 } from 'expo-audio';
 import { usePlayer, registerSeek } from '@/store/player';
-import { resolvePlaybackUri } from '@/store/library';
+import { resolvePlaybackUri, useLibrary } from '@/store/library';
 import { formatTime } from '@/lib/format';
 import {
   syncNowPlaying,
@@ -55,6 +55,7 @@ export default function AudioController() {
   const setStatus = usePlayer((s) => s.setStatus);
   const onFinish = usePlayer((s) => s.onFinish);
 
+  const recordPlay = useLibrary((s) => s.recordPlay);
   const loadedTrackId = useRef<string | null>(null);
   // Whether this player is registered as the OS "now playing" controller.
   const lockScreenActive = useRef(false);
@@ -93,6 +94,7 @@ export default function AudioController() {
     loadedTrackId.current = track.id;
     player.replace({ uri });
     player.play();
+    recordPlay(track);
 
     // iOS: publish to the Now Playing info center — this populates the lock
     // screen AND the Dynamic Island media presentation. Register once, then
