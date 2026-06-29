@@ -140,7 +140,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (track.previewOnly) {
       notify(
         'Preview only',
-        'This is a 30-second preview from Deezer and can't be saved offline. Full tracks from Audius can be downloaded.'
+        "This is a 30-second preview from Deezer and can't be saved offline. Full tracks from Audius can be downloaded."
       );
       return;
     }
